@@ -1,6 +1,6 @@
 # Stage 1: Build the silverbullet binary
 FROM denoland/deno:2.6.1 AS builder
-RUN apt update && apt install -y git wget make
+RUN apt update && apt install -y git wget make libffi-dev
 
 ARG TARGETARCH
 ENV GO_VERSION=1.25.1
@@ -18,7 +18,7 @@ RUN deno task build-production
 RUN go build
 
 # Stage 2: Create the runtime from the build
-FROM alpine:latest
+FROM ubuntu:latest
 
 # The volume that will keep the space data
 VOLUME /space
@@ -30,7 +30,7 @@ VOLUME /space
 # Or simply mount an existing folder into the container:
 #   docker run -v /path/to/my/folder:/space -p3000:3000 -it ghcr.io/silverbulletmd/silverbullet
 
-RUN apk add --no-cache git curl bash tini
+RUN apt update && apt install -y git curl bash tini libffi-dev
 
 HEALTHCHECK CMD curl --fail http://localhost:3000$SB_URL_PREFIX/.ping || exit 1
 
@@ -53,4 +53,5 @@ COPY --from=builder /app/silverbullet /silverbullet
 
 # Run the server, allowing to pass in additional argument at run time, e.g.
 #   docker run -p 3002:3000 -v myspace:/space -it ghcr.io/silverbulletmd/silverbullet --user me:letmein
-ENTRYPOINT ["/sbin/tini", "--", "/docker-entrypoint.sh"]
+# ENTRYPOINT ["/sbin/tini", "--", "/docker-entrypoint.sh"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

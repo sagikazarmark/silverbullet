@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apache/opendal-go-services/s3"
+	opendal "github.com/apache/opendal/bindings/go"
 	"github.com/silverbulletmd/silverbullet/server"
 	"github.com/spf13/cobra"
 )
@@ -73,7 +75,34 @@ func buildConfig(bundledFiles fs.FS, args []string) *server.ServerConfig {
 	}
 
 	var spacePrimitives server.SpacePrimitives
-	spacePrimitives, err := server.NewDiskSpacePrimitives(rootSpaceConfig.SpaceFolderPath, rootSpaceConfig.GitIgnore)
+	var err error
+
+	storageDriver := os.Getenv("SB_STORAGE_DRIVER")
+
+	if storageDriver == "" || storageDriver == "disk" {
+		spacePrimitives, err = server.NewDiskSpacePrimitives(rootSpaceConfig.SpaceFolderPath, rootSpaceConfig.GitIgnore)
+	} else if storageDriver == "opendal" {
+		switch scheme := os.Getenv("SB_OPENDAL_SCHEME"); scheme {
+		case "s3":
+			options := opendal.OperatorOptions{
+				"access_key_id":     os.Getenv("SB_OPENDAL_ACCESS_KEY_ID"),
+				"secret_access_key": os.Getenv("SB_OPENDAL_SECRET_ACCESS_KEY"),
+				"region":            os.Getenv("SB_OPENDAL_REGION"),
+				"bucket":            os.Getenv("SB_OPENDAL_BUCKET"),
+				"endpoint":          os.Getenv("SB_OPENDAL_ENDPOINT"),
+			}
+			operator, e := opendal.NewOperator(s3.Scheme, options)
+			if e != nil {
+				log.Fatalf("Failed to create OpenDAL operator: %v", e)
+			}
+
+			spacePrimitives, err = server.NewOpenDALSpacePrimitives(operator, rootSpaceConfig.SpaceFolderPath, rootSpaceConfig.GitIgnore)
+		default:
+			log.Fatalf("Unsupported OpenDAL scheme: %s", scheme)
+		}
+	} else {
+		log.Fatalf("Unsupported storage driver: %s", storageDriver)
+	}
 
 	rootSpaceConfig.ReadOnlyMode = os.Getenv("SB_READ_ONLY") != ""
 

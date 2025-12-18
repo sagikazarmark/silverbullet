@@ -1,0 +1,7 @@
+services:
+  silverbullet:
+    build:
+      context: .
+    env_file: .env
+    ports:
+      - 127.0.0.1:3002:3000
